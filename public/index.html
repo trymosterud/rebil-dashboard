@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rebil – Omregistreringstracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.1);
+    --text: #1a1a1a;
+    --muted: #666;
+    --red-bg: #fef2f2;
+    --red-text: #991b1b;
+    --green-bg: #f0fdf4;
+    --green-text: #166534;
+    --amber-bg: #fffbeb;
+    --amber-text: #92400e;
+    --gray-bg: #f9fafb;
+    --gray-text: #374151;
+    --accent: #1a1a1a;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 100%; max-width: 340px; }
+  .login-logo { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.5rem; }
+  .login-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .login-sub { font-size: 14px; color: var(--muted); margin-bottom: 1.5rem; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 1rem; }
+  .field label { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .field input { font-size: 15px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--gray-bg); color: var(--text); outline: none; }
+  .field input:focus { border-color: var(--accent); }
+  .btn { width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .btn:hover { opacity: 0.88; }
+  .err { font-size: 13px; color: var(--red-text); margin-top: 8px; display: none; }
+  #dashboard { display: none; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 1.5rem; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .topbar-left { display: flex; align-items: center; gap: 10px; }
+  .logo { font-size: 15px; font-weight: 600; }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+  .status-dot.loading { background: #f59e0b; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .last-updated { font-size: 12px; color: var(--muted); }
+  .refresh-btn { font-size: 13px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; background: transparent; cursor: pointer; color: var(--text); }
+  .refresh-btn:hover { background: var(--gray-bg); }
+  .main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+  .metric-val { font-size: 26px; font-weight: 600; }
+  .metric-val.red { color: #dc2626; }
+  .metric-val.green { color: #16a34a; }
+  .metric-val.amber { color: #d97706; }
+  .metric-lbl { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .filter-btn { font-size: 13px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; background: transparent; cursor: pointer; color: var(--muted); }
+  .filter-btn:hover { background: var(--gray-bg); }
+  .filter-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .search-wrap { flex: 1; min-width: 180px; position: relative; }
+  .search-wrap input { width: 100%; font-size: 13px; padding: 7px 12px 7px 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); outline: none; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); background: var(--gray-bg); }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.row-avvik td { background: var(--red-bg); }
+  tr.row-komm td { background: var(--amber-bg); }
+  tr:hover td { filter: brightness(0.97); }
+  .reg { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; font-weight: 600; background: var(--gray-bg); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); white-space: nowrap; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .badge.avvik { background: var(--red-bg); color: var(--red-text); }
+  .badge.ok { background: var(--green-bg); color: var(--green-text); }
+  .badge.venter { background: var(--amber-bg); color: var(--amber-text); }
+  .badge.ukjent { background: var(--gray-bg); color: var(--gray-text); }
+  .pipeline-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; color: var(--muted); background: var(--gray-bg); }
+  .hs-link { color: #1d4ed8; font-size: 12px; text-decoration: none; }
+  .hs-link:hover { text-decoration: underline; }
+  .empty { text-align: center; padding: 3rem; color: var(--muted); font-size: 14px; }
+  .loading-row { text-align: center; padding: 3rem; color: var(--muted); font-size: 14px; }
+  @media (max-width: 600px) {
+    th.hide-mobile, td.hide-mobile { display: none; }
+    .main { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="login">
+  <div class="login-card">
+    <div class="login-logo">Rebil Group</div>
+    <div class="login-title">Omregistreringstracker</div>
+    <div class="login-sub">Logg inn for å se bilstatus</div>
+    <div class="field">
+      <label>Passord</label>
+      <input type="password" id="pw" placeholder="••••••••" onkeydown="if(event.key==='Enter')loggInn()" autofocus />
+    </div>
+    <button class="btn" onclick="loggInn()">Logg inn</button>
+    <div class="err" id="pw-err">Feil passord – prøv igjen</div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">Rebil <span>/ omregistreringstracker</span></div>
+      <div class="status-dot" id="status-dot"></div>
+    </div>
+    <div class="topbar-right">
+      <span class="last-updated" id="last-updated"></span>
+      <button class="refresh-btn" onclick="lastData()">↻ Oppdater</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="metrics">
+      <div class="metric"><div class="metric-val" id="m-total">–</div><div class="metric-lbl">Biler overvåket</div></div>
+      <div class="metric"><div class="metric-val red" id="m-avvik">–</div><div class="metric-lbl">Avvik – Salg NY</div></div>
+      <div class="metric"><div class="metric-val amber" id="m-komm">–</div><div class="metric-lbl">Nylig omreg. – Kommisjon</div></div>
+      <div class="metric"><div class="metric-val green" id="m-ok">–</div><div class="metric-lbl">OK</div></div>
+    </div>
+
+    <div class="toolbar">
+      <button class="filter-btn active" onclick="filtrer('alle',this)">Alle</button>
+      <button class="filter-btn" onclick="filtrer('avvik',this)">Kun avvik</button>
+      <button class="filter-btn" onclick="filtrer('salgny',this)">Salg NY</button>
+      <button class="filter-btn" onclick="filtrer('kommisjon',this)">Kommisjon</button>
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" placeholder="Søk reg.nr eller navn..." oninput="sok(this.value)" />
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Reg.nr</th>
+            <th>Bil / kunde</th>
+            <th class="hide-mobile">Pipeline</th>
+            <th class="hide-mobile">Stage</th>
+            <th>Autosys-status</th>
+            <th class="hide-mobile">Omreg. dato</th>
+            <th class="hide-mobile">Fra eier</th>
+            <th>HubSpot</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body">
+          <tr><td colspan="8" class="loading-row">Laster data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let alleData = [];
+let aktivFilter = 'alle';
+let sokTekst = '';
+
+async function loggInn() {
+  const pw = document.getElementById('pw').value;
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ passord: pw })
+  });
+  if (res.ok) {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    lastData();
+  } else {
+    document.getElementById('pw-err').style.display = 'block';
+  }
+}
+
+async function lastData() {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot loading';
+  document.getElementById('tbl-body').innerHTML = '<tr><td colspan="8" class="loading-row">Henter data fra HubSpot...</td></tr>';
+  try {
+    const res = await fetch('/api/deals');
+    if (res.status === 401) { location.reload(); return; }
+    const data = await res.json();
+    alleData = data.deals || [];
+    oppdaterMetrics();
+    renderTabell();
+    dot.className = 'status-dot';
+    document.getElementById('last-updated').textContent = 'Oppdatert ' + new Date().toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    dot.className = 'status-dot';
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="8" class="loading-row">Feil ved henting av data. Prøv igjen.</td></tr>';
+  }
+}
+
+function oppdaterMetrics() {
+  const avvik = alleData.filter(d => d.status === 'avvik').length;
+  const komm = alleData.filter(d => d.status === 'komm').length;
+  const ok = alleData.filter(d => d.status === 'ok').length;
+  document.getElementById('m-total').textContent = alleData.length;
+  document.getElementById('m-avvik').textContent = avvik;
+  document.getElementById('m-komm').textContent = komm;
+  document.getElementById('m-ok').textContent = ok;
+}
+
+function filtrer(f, btn) {
+  aktivFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTabell();
+}
+
+function sok(v) { sokTekst = v.toLowerCase(); renderTabell(); }
+
+function renderTabell() {
+  const data = alleData.filter(d => {
+    if (aktivFilter === 'avvik' && d.status !== 'avvik') return false;
+    if (aktivFilter === 'salgny' && d.pipeline !== 'salgny') return false;
+    if (aktivFilter === 'kommisjon' && d.pipeline !== 'kommisjon') return false;
+    if (sokTekst && !d.regNr.toLowerCase().includes(sokTekst) && !d.navn.toLowerCase().includes(sokTekst)) return false;
+    return true;
+  });
+  if (!data.length) {
+    document.getElementById('tbl-body').innerHTML = '<tr><td colspan="8" class="empty">Ingen biler matcher filteret</td></tr>';
+    return;
+  }
+  document.getElementById('tbl-body').innerHTML = data.map(d => {
+    const rowCls = d.status === 'avvik' ? 'row-avvik' : d.status === 'komm' ? 'row-komm' : '';
+    const badge = d.status === 'avvik'
+      ? '<span class="badge avvik">⚠ Omregistrert</span>'
+      : d.status === 'komm'
+      ? '<span class="badge venter">↻ Nylig omreg.</span>'
+      : d.status === 'ok'
+      ? '<span class="badge ok">✓ OK</span>'
+      : '<span class="badge ukjent">– Ikke sjekket</span>';
+    const pipeline = d.pipeline === 'salgny' ? 'Salg NY' : 'Kommisjon';
+    const url = `https://app.hubspot.com/contacts/25445101/record/0-3/${d.dealId}`;
+    return `<tr class="${rowCls}">
+      <td><span class="reg">${d.regNr}</span></td>
+      <td>${d.navn}</td>
+      <td class="hide-mobile"><span class="pipeline-tag">${pipeline}</span></td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${d.stage || '–'}</td>
+      <td>${badge}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${d.omregistrertDato || '–'}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${d.fraEier || '–'}</td>
+      <td><a class="hs-link" href="${url}" target="_blank">↗ Åpne</a></td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
